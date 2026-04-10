@@ -32,18 +32,20 @@ model Chat {
   isGroup   Boolean   @default(false)
   name      String?
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   users     User[]    @relation("chatUsers")
   messages  Message[]
 }
 
 model Message {
   id        String   @id @default(uuid())
-  content       String
+  content   String
   createdAt DateTime @default(now())
   sender    User     @relation(fields: [senderId], references: [id])
   senderId  String
   chat      Chat     @relation(fields: [chatId], references: [id])
   chatId    String
+
   @@index([chatId])
 }
 
