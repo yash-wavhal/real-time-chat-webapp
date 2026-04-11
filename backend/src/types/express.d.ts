@@ -1,8 +1,6 @@
-import { User } from '@prisma/client';
-
-declare global {
+// declare global {
   // Modify global types available everywhere
-  namespace Express {
+declare namespace Express {
     // TypeScript already has built-in types for Express
     interface Request {
       user?: {
@@ -13,5 +11,4 @@ declare global {
         profilePic: string | null;
       };
     }
-  }
 }
