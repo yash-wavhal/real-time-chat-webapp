@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import prisma from '../lib/prisma';
+import { io, userSocketMap } from '..';
 
 export const getAllMsgs = async (req: Request, res: Response) => {
   try {
@@ -57,7 +58,7 @@ export const getAllMsgs = async (req: Request, res: Response) => {
 export const createNewMsg = async (req: Request, res: Response) => {
   try {
     const currUser = req.user;
-    const { chatId, content } = req.body;
+    const { chatId, receiverId, content } = req.body;
 
     if (!currUser) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -109,6 +110,18 @@ export const createNewMsg = async (req: Request, res: Response) => {
       where: { id: chatId },
       data: {},
     });
+
+    const receiverSocketId = userSocketMap.get(receiverId);
+
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('newMessage', newMsg);
+    }
+
+    const senderSocketId = userSocketMap.get(userId);
+
+    if (senderSocketId) {
+      io.to(senderSocketId).emit('newMessage', newMsg);
+    }
 
     res.status(201).json({ msg: 'Message created successfully', newMsg });
   } catch (err: any) {
