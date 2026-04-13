@@ -23,6 +23,7 @@ export const getAllChats = async (req: Request, res: Response) => {
         users: {
           select: {
             id: true,
+            email: true,
             username: true,
             fullName: true,
             profilePic: true,
@@ -34,7 +35,29 @@ export const getAllChats = async (req: Request, res: Response) => {
       },
     });
 
-    res.status(200).json({ msg: 'Chats fetched successfully!', chats });
+    const formattedChats = chats.map((chat) => {
+      if (!chat.isGroup) {
+        const otherUser = chat.users.find((u) => u.id !== userId);
+        return {
+          id: chat.id,
+          createdAt: chat.createdAt,
+          isGroup: false,
+          otherUser,
+          updatedAt: chat.updatedAt,
+        };
+      }
+
+      return {
+        id: chat.id,
+        createdAt: chat.createdAt,
+        isGroup: true,
+        name: chat.name,
+        users: chat.users,
+        updatedAt: chat.updatedAt,
+      };
+    });
+
+    res.status(200).json({ msg: 'Chats fetched successfully!', formattedChats });
   } catch (err: any) {
     console.log('Error in getting all chats', err.message);
     res.status(500).json({ error: 'Internal Server Error' });
