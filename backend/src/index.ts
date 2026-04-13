@@ -3,6 +3,7 @@ import http from 'http';
 import dotenv from 'dotenv';
 
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
 import authRoutes from './routes/auth.route';
 import userRoutes from './routes/user.route';
 import messageRoutes from './routes/message.route';
@@ -58,6 +59,12 @@ io.on('connection', (socket) => {
 
 app.use(cookieParser());
 app.use(express.json());
+app.use(
+  cors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+  })
+);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
