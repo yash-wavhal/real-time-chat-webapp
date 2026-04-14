@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { api } from '@/lib/axios';
 import LogoutButton from '@/components/LogoutComponent';
+import { AuthProvider } from '@/components/context/AuthContext';
+import { SocketProvider } from '@/components/context/SocketContext';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -27,11 +29,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <div className="flex justify-end p-2 bg-gray-700">
-          <LogoutButton />
-        </div>
-
-        {children}
+        <AuthProvider>
+          <SocketProvider>{children}</SocketProvider>
+        </AuthProvider>
       </body>
     </html>
   );

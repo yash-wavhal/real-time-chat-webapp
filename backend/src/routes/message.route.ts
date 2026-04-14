@@ -4,7 +4,7 @@ import { createNewMsg, getAllMsgs } from "../controllers/message.controller";
 
 const router = express.Router();
 
-router.get("/", protectRoute, getAllMsgs);
+router.get("/:chatid", protectRoute, getAllMsgs);
 router.post("/", protectRoute, createNewMsg);
 
 export default router;

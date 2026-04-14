@@ -29,6 +29,24 @@ export const getAllChats = async (req: Request, res: Response) => {
             profilePic: true,
           },
         },
+        messages: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1,
+          select: {
+            id: true,
+            content: true,
+            senderId: true,
+            createdAt: true,
+            sender: {
+              select: {
+                id: true,
+                username: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         updatedAt: 'desc',
@@ -36,24 +54,31 @@ export const getAllChats = async (req: Request, res: Response) => {
     });
 
     const formattedChats = chats.map((chat) => {
+      const lastMessage = chat.messages[0] || null;
+
       if (!chat.isGroup) {
         const otherUser = chat.users.find((u) => u.id !== userId);
+
         return {
           id: chat.id,
           createdAt: chat.createdAt,
           isGroup: false,
           otherUser,
           updatedAt: chat.updatedAt,
+          lastMessage,
         };
       }
+
+      const otherUsers = chat.users.filter((u) => u.id !== userId);
 
       return {
         id: chat.id,
         createdAt: chat.createdAt,
         isGroup: true,
         name: chat.name,
-        users: chat.users,
+        members: otherUsers,
         updatedAt: chat.updatedAt,
+        lastMessage,
       };
     });
 
@@ -67,7 +92,15 @@ export const getAllChats = async (req: Request, res: Response) => {
 export const createNewChat = async (req: Request, res: Response) => {
   try {
     const currUser = req.user;
+    // console.log('body:', req.body);
+    // console.log('query:', req.query);
+    // console.log('params:', req.params);
     const { otherUserId } = req.body;
+    console.log('otherUserId', otherUserId);
+
+    if (!otherUserId) {
+      return res.status(401).json({ error: 'otherUserId is undefined' });
+    }
 
     if (!currUser) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -152,7 +185,13 @@ export const createNewChat = async (req: Request, res: Response) => {
       },
     });
 
-    res.status(200).json({ msg: 'Chat created successfully!', newChat });
+    let isNewChat = false;
+
+    if (newChat) {
+      isNewChat = true;
+    }
+
+    res.status(200).json({ msg: 'Chat created successfully!', newChat, isNewChat });
   } catch (err: any) {
     console.log('Error in creating new chat', err.message);
     res.status(500).json({ error: 'Internal Server Error' });

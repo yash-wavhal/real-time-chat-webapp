@@ -1,10 +1,9 @@
 import express, {Request, Response} from "express";
 
-export const getMe = async (req: Request, res: Response) => {
-    try {
-        
-    } catch (err: any) {
-        console.log("Error in user controller", err.message);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-}
+export const getMe = (req: Request, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  res.json(req.user);
+};
