@@ -5,7 +5,7 @@
     "module": "commonjs",
     "strict": true,
     "esModuleInterop": true,
-    "outDir": "./dist",
+    // "outDir": "./dist",
     "typeRoots": ["./src/types", "./node_modules/@types"],
     "skipLibCheck": true
   },

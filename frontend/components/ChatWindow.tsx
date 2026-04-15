@@ -1,58 +1,22 @@
 'use client';
 
 import { api } from '@/lib/axios';
-import { HtmlHTMLAttributes, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from './context/AuthContext';
-
-interface otherUser {
-  id: string;
-  username: string;
-  fullName: string;
-  profilePic: string;
-  email: string;
-}
-
-interface Chat {
-  id: string;
-  createdAt: string;
-  isGroup: boolean;
-  updatedAt: string;
-  name: string;
-  otherUser: otherUser;
-  members: otherUser[];
-  lastMessage: {
-    content: string;
-    createdAt: string;
-    id: string;
-    senderId: string;
-    sender: {
-      id: string;
-      username: string;
-    };
-  };
-}
-
-interface Message {
-  id: string;
-  chatId: string;
-  createdAt: string;
-  content: string;
-  senderId: string;
-  sender: {
-    id: string;
-    username: string;
-    profilePic: string;
-  };
-}
+import { Chat } from '@/types/chat';
+import { Message } from '@/types/message';
+import '../app/global.css';
+import { Send } from 'lucide-react';
 
 interface Props {
   selectedChat: Chat;
   msgs: Message[];
   getFormattedTime: (createdAt?: string) => string;
   setMsgs: React.Dispatch<React.SetStateAction<Message[]>>;
+  setChats: React.Dispatch<React.SetStateAction<Chat[]>>;
 }
 
-export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMsgs }: Props) {
+export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMsgs, setChats }: Props) {
   const [msg, setMsg] = useState<string>('');
   const { user, loading } = useAuth();
   // console.log('selectedChat', selectedChat);
@@ -87,7 +51,45 @@ export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMs
       },
     };
 
+    // update messages (optimistic)
     setMsgs((prev) => [...prev, tempMsg]);
+
+    setChats((prevChats) => {
+      const safePrev = prevChats.filter(Boolean);
+
+      const exists = safePrev.find((c) => c.id === selectedChat.id);
+
+      // Case 1: existing chat
+      if (exists) {
+        const updated = safePrev.map((chat) => {
+          if (chat.id === selectedChat.id) {
+            return {
+              ...chat,
+              lastMessage: tempMsg,
+              updatedAt: tempMsg.createdAt,
+            };
+          }
+          return chat;
+        });
+
+        const currentChat = updated.find((c) => c.id === selectedChat.id);
+        const rest = updated.filter((c) => c.id !== selectedChat.id);
+
+        if (!currentChat) return updated; // safety
+
+        return [currentChat, ...rest];
+      }
+
+      // Case 2: NEW CHAT (THIS WAS MISSING)
+      const newChat = {
+        ...selectedChat,
+        lastMessage: tempMsg,
+        updatedAt: tempMsg.createdAt,
+      };
+
+      return [newChat, ...safePrev];
+    });
+
     setMsg('');
 
     try {
@@ -102,53 +104,69 @@ export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMs
   return (
     <div className="w-full h-full flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center">
-          {!selectedChat.isGroup
-            ? selectedChat.otherUser.username[0].toUpperCase()
-            : selectedChat.name[0].toUpperCase()}
+      <div className="p-4 bg-mist-800 h-18 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-600 flex items-center justify-center text-white">
+          {!selectedChat?.isGroup ? (
+            selectedChat?.otherUser?.profilePic ? (
+              <img
+                src={selectedChat.otherUser.profilePic}
+                alt={selectedChat.otherUser.fullName}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="flex items-center justify-center text-xl w-full h-full">
+                {selectedChat?.otherUser?.username?.charAt(0).toUpperCase()}
+              </div>
+            )
+          ) : (
+            <div className="flex items-center justify-center text-xl w-full h-full">
+              {selectedChat?.members?.[0]?.username?.charAt(0).toUpperCase() || 'G'}
+            </div>
+          )}
         </div>
 
         <p className="font-semibold">
-          {!selectedChat.isGroup ? selectedChat.otherUser.username : selectedChat.name}
+          {!selectedChat?.isGroup ? selectedChat?.otherUser?.username : selectedChat?.name}
         </p>
       </div>
 
       {/* Messages */}
-      <div id="chat-container" className="flex-1 p-4 overflow-y-auto space-y-3">
+      <div id="chat-container" className="flex-1 p-2 overflow-y-auto scrollbar-modern space-y-3">
         {msgs.map((msg) => (
           <div
             key={msg.id}
             className={`flex ${
-              msg.senderId === selectedChat.otherUser?.id ? 'justify-start' : 'justify-end'
+              msg?.senderId === selectedChat?.otherUser?.id ? 'justify-start' : 'justify-end'
             }`}
           >
             <div
               className={`${
-                msg.senderId === selectedChat.otherUser?.id ? 'bg-gray-300' : 'bg-green-300'
-              } px-3 py-2 rounded-lg max-w-xs`}
+                msg?.senderId === selectedChat?.otherUser?.id
+                  ? 'bg-gray-300 rounded-bl-2xl rounded-tr-2xl rounded-br-2xl'
+                  : 'bg-green-300 rounded-br-2xl rounded-tl-2xl rounded-bl-2xl'
+              } px-3 py-2 max-w-xs`}
             >
-              <p className="text-sm text-black">{msg.content}</p>
-              <span className="text-[10px] text-gray-500">{getFormattedTime(msg.createdAt)}</span>
+              <p className="text-sm text-black">{msg?.content}</p>
+              <span className="text-[10px] text-gray-500">{getFormattedTime(msg?.createdAt)}</span>
             </div>
           </div>
         ))}
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t flex gap-2">
+      <div className=" m-2 flex gap-2 rounded-4xl bg-mist-800">
         <input
           type="text"
           value={msg}
           onChange={handleChange}
           placeholder="Type a message..."
-          className="flex-1 border p-2 rounded text-black"
+          className="flex-1 w-full p-4 text-gray-100 focus:outline-none focus:ring-0"
         />
         <button
-          className="bg-black text-white px-4 rounded hover:bg-gray-900 cursor-pointer"
+          className="bg-green-700 text-white px-6 m-2 rounded-4xl hover:bg-green-800 cursor-pointer"
           onClick={handleSendMsg}
         >
-          Send
+          <Send size={20} />
         </button>
       </div>
     </div>

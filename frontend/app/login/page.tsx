@@ -24,7 +24,7 @@ export default function Page() {
     try {
       const res = await api.post('/auth/login', form);
         // console.log('res data', res.data);
-        router.push('/chatlayout');
+        router.push('/');
     } catch (err: any) {
       console.log('Error in registering user', err.message);
     }
@@ -47,7 +47,7 @@ export default function Page() {
 
       {/* RIGHT SIDE (FORM) */}
       <div className="w-1/2 bg-white flex items-center justify-center">
-        <form onSubmit={handleSubmit} className="w-[350px] space-y-4">
+        <form onSubmit={handleSubmit} className="w-120 space-y-4">
           <h2 className="text-2xl font-semibold text-black">Login</h2>
 
           <input
@@ -56,7 +56,7 @@ export default function Page() {
             placeholder="Username"
             value={form.username}
             onChange={handleChange}
-            className="w-full border p-2 rounded border-2 border-black text-black"
+            className="w-full p-2 rounded border-2 border-black text-black"
           />
 
           <input
@@ -65,7 +65,7 @@ export default function Page() {
             placeholder="Email"
             value={form.email}
             onChange={handleChange}
-            className="w-full border p-2 rounded border-2 border-black text-black"
+            className="w-full p-2 rounded border-2 border-black text-black"
           />
 
           <input
@@ -74,7 +74,7 @@ export default function Page() {
             placeholder="Password"
             value={form.password}
             onChange={handleChange}
-            className="w-full border p-2 rounded border-2 border-black text-black"
+            className="w-full p-2 rounded border-2 border-black text-black"
           />
 
           <button

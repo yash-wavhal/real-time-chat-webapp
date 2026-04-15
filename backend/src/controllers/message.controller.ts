@@ -121,36 +121,92 @@ export const createNewMsg = async (req: Request, res: Response) => {
     });
 
     // Get all users in chat
-    const chatWithUsers = await prisma.chat.findUnique({
+    const chatWithDetails = await prisma.chat.findUnique({
       where: { id: chatId },
       include: {
         users: {
-          select: { id: true },
+          select: {
+            id: true,
+            email: true,
+            username: true,
+            fullName: true,
+            profilePic: true,
+          },
+        },
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            content: true,
+            senderId: true,
+            createdAt: true,
+            sender: {
+              select: {
+                id: true,
+                username: true,
+              },
+            },
+          },
         },
       },
     });
 
-    // Emit to all users except sender
-    chatWithUsers?.users.forEach((user) => {
+    // safety check
+    if (!chatWithDetails) {
+      return res.status(500).json({ error: 'Chat not found after message creation' });
+    }
+
+    // FORMAT FUNCTION (PER USER)
+    const formatChatForUser = (chat: any, currentUserId: string) => {
+      const lastMessage = chat.messages?.[0] || null;
+
+      if (!chat.isGroup) {
+        const otherUser = chat.users.find(
+          (u: any) => u.id !== currentUserId
+        );
+
+        return {
+          id: chat.id,
+          createdAt: chat.createdAt,
+          isGroup: false,
+          otherUser,
+          updatedAt: chat.updatedAt,
+          lastMessage,
+        };
+      }
+
+      const members = chat.users.filter((u: any) => u.id !== currentUserId);
+
+      return {
+        id: chat.id,
+        createdAt: chat.createdAt,
+        isGroup: true,
+        name: chat.name,
+        members,
+        updatedAt: chat.updatedAt,
+        lastMessage,
+      };
+    };
+
+    // EMIT TO ALL USERS (INCLUDING SENDER)
+    chatWithDetails.users.forEach((user) => {
       if (user.id === userId) return;
-
-      console.log('Sending to user:', user.id);
-
       const socketId = userSocketMap.get(user.id);
 
+      if (!socketId) return;
+
+      // format per user
+      const formattedChat = formatChatForUser(chatWithDetails, user.id);
+
+      console.log('Sending to user:', user.id);
       console.log('Socket found:', socketId);
 
-      if (socketId) {
-        io.to(socketId).emit('newMessage', newMsg);
-      }
+      io.to(socketId).emit('newMessage', {
+        message: newMsg,
+        chat: formattedChat,
+      });
     });
-
-    // Emit back to sender (for sync)
-    const senderSocketId = userSocketMap.get(userId);
-
-    if (senderSocketId) {
-      io.to(senderSocketId).emit('newMessage', newMsg);
-    }
 
     res.status(201).json({
       message: 'Message created successfully',
