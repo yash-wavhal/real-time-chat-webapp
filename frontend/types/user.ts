@@ -4,4 +4,5 @@ export interface OtherUser {
   fullName: string;
   profilePic: string;
   email: string;
+  lastSeen: string;
 }

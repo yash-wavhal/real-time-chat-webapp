@@ -6,7 +6,8 @@ import { useAuth } from './context/AuthContext';
 import { Chat } from '@/types/chat';
 import { Message } from '@/types/message';
 import '../app/global.css';
-import { Send } from 'lucide-react';
+import { Send, SendHorizonalIcon } from 'lucide-react';
+import { socket } from '@/lib/socket';
 
 interface Props {
   selectedChat: Chat;
@@ -14,9 +15,11 @@ interface Props {
   getFormattedTime: (createdAt?: string) => string;
   setMsgs: React.Dispatch<React.SetStateAction<Message[]>>;
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>;
+  isTyping: boolean;
+  onlineUsers: string[];
 }
 
-export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMsgs, setChats }: Props) {
+export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMsgs, setChats, isTyping, onlineUsers }: Props) {
   const [msg, setMsg] = useState<string>('');
   const { user, loading } = useAuth();
   // console.log('selectedChat', selectedChat);
@@ -31,8 +34,24 @@ export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMs
     });
   }, [msgs]);
 
+  let typingTimeout: NodeJS.Timeout;
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMsg(e.target.value);
+
+    socket.emit('typing', {
+      chatId: selectedChat?.id,
+      userId: user?.id,
+    });
+
+    clearTimeout(typingTimeout);
+
+    typingTimeout = setTimeout(() => {
+      socket.emit('stopTyping', {
+        chatId: selectedChat?.id,
+        userId: user?.id,
+      });
+    }, 3000);
   };
 
   const handleSendMsg = async () => {
@@ -101,6 +120,8 @@ export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMs
       console.log(err);
     }
   };
+
+  const isOnline = onlineUsers.includes(selectedChat?.otherUser?.id);
   return (
     <div className="w-full h-full flex flex-col">
       {/* Header */}
@@ -125,9 +146,19 @@ export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMs
           )}
         </div>
 
-        <p className="font-semibold">
-          {!selectedChat?.isGroup ? selectedChat?.otherUser?.username : selectedChat?.name}
-        </p>
+        <div>
+          <p className="font-semibold">
+            {!selectedChat?.isGroup ? selectedChat?.otherUser?.username : selectedChat?.name}
+          </p>
+          {isTyping && <p className="text-sm text-gray-500">typing...</p>}
+          {!isOnline && (
+            <p className="text-xs text-gray-400">
+              {selectedChat?.otherUser?.lastSeen
+                ? `last seen ${new Date(selectedChat.otherUser.lastSeen).toLocaleTimeString()}`
+                : 'last seen recently'}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
@@ -166,7 +197,7 @@ export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMs
           className="bg-green-700 text-white px-6 m-2 rounded-4xl hover:bg-green-800 cursor-pointer"
           onClick={handleSendMsg}
         >
-          <Send size={20} />
+          <SendHorizonalIcon size={20} />
         </button>
       </div>
     </div>

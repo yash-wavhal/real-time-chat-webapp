@@ -15,6 +15,63 @@ export default function Page() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [msgs, setMsgs] = useState<Message[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [isTyping, setIsTyping] = useState<boolean>(false);
+
+  useEffect(() => {
+    socket?.emit("joinChat", selectedChat?.id)
+  }, [selectedChat]);
+
+  useEffect(() => {
+    if (!socket) return;
+    socket.on('typing', ({ chatId, userId }) => {
+      if (chatId === selectedChat?.id && userId !== user?.id) {
+        setIsTyping(true);
+      }
+    });
+
+    socket.on('stopTyping', ({ chatId, userId }) => {
+      if (chatId === selectedChat?.id && userId !== user?.id) {
+        setIsTyping(false);
+      }
+    });
+
+    return () => {
+      socket.off('typing');
+      socket.off('stopTyping');
+    };
+  }, [selectedChat]);
+
+  useEffect(() => {
+      if (!socket) return;
+
+    const handleOnline = (userId: string) => {
+        // console.log('online user: ', userId);
+        setOnlineUsers((prev) => {
+          if (prev.includes(userId)) return prev;
+          return [...prev, userId];
+        });
+      };
+
+      const handleOffline = (userId: string) => {
+        setOnlineUsers((prev) => prev.filter((p) => p !== userId));
+      };
+
+      const handleInitialUsers = (users: string[]) => {
+        // console.log('Initial users:', users);
+        setOnlineUsers(users);
+      };
+
+      socket.on('getOnlineUsers', handleInitialUsers);
+      socket.on('userOnline', handleOnline);
+      socket.on('userOffline', handleOffline);
+
+      return () => {
+        socket.off('getOnlineUsers', handleInitialUsers);
+        socket.off('userOnline', handleOnline);
+        socket.off('userOffline', handleOffline);
+      };
+    }, [socket, user?.id]);
 
   useEffect(() => {
     const fetchChats = async () => {
@@ -36,7 +93,7 @@ export default function Page() {
 
       if (!chat || !chat.id) return;
 
-      // 🔥 ignore sender
+      // ignore sender
       if (message.senderId === user?.id) return;
 
       // Update messages if open
@@ -121,6 +178,9 @@ export default function Page() {
           chats={chats}
           handleChatClick={handleChatClick}
           getFormattedTime={getFormattedTime}
+          onlineUsers={onlineUsers}
+          isTyping={isTyping}
+          selectedChat={selectedChat}
         />
       </div>
 
@@ -133,6 +193,8 @@ export default function Page() {
             getFormattedTime={getFormattedTime}
             setMsgs={setMsgs}
             setChats={setChats}
+            isTyping={isTyping}
+            onlineUsers={onlineUsers}
           />
         ) : (
           <p className="text-gray-500 flex items-center justify-center h-full">

@@ -3,12 +3,15 @@ import { Chat } from '@/types/chat';
 interface Props {
   chat: Chat;
   getFormattedTime: (createdAt?: string) => string;
+  isOnline: boolean;
+  isTyping: boolean;
+  selectedChat: Chat | null;
 }
 
-function ChatList({ chat, getFormattedTime }: Props) {
+function ChatList({ chat, getFormattedTime, isOnline, isTyping, selectedChat }: Props) {
   if (!chat) return null;
   return (
-    <div className="flex items-center gap-3 p-3 rounded-b-xl cursor-pointer hover:bg-mist-800 transition border-b border-mist-900">
+    <div className="relative flex items-center gap-3 p-3 rounded-b-xl cursor-pointer hover:bg-mist-800 transition border-b border-mist-900">
       <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-600 flex items-center justify-center text-white">
         {!chat?.isGroup ? (
           chat?.otherUser?.profilePic ? (
@@ -27,6 +30,9 @@ function ChatList({ chat, getFormattedTime }: Props) {
             {chat?.members?.[0]?.username?.charAt(0).toUpperCase() || 'G'}
           </div>
         )}
+        {!chat?.isGroup && isOnline && (
+          <span className="absolute left-9 bottom-2 w-3 h-3 bg-green-500 rounded-full border-2 border-black"></span>
+        )}
       </div>
 
       {/* Chat Info */}
@@ -44,7 +50,11 @@ function ChatList({ chat, getFormattedTime }: Props) {
         </div>
 
         {!chat.isGroup ? (
-          <p className="text-sm text-gray-400 truncate">{chat?.lastMessage?.content}</p>
+          selectedChat?.id === chat?.id && isTyping ? (
+            <p className="text-sm text-gray-500">typing...</p>
+          ) : (
+            <p className="text-sm text-gray-400 truncate">{chat?.lastMessage?.content}</p>
+          )
         ) : (
           <p className="text-sm text-gray-400 truncate">
             {chat?.lastMessage?.sender?.username}: {chat?.lastMessage?.content}

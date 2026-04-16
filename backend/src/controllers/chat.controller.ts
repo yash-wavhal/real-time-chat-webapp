@@ -24,6 +24,7 @@ export const getAllChats = async (req: Request, res: Response) => {
           select: {
             id: true,
             email: true,
+            lastSeen: true,
             username: true,
             fullName: true,
             profilePic: true,

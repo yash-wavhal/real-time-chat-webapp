@@ -7,15 +7,29 @@ import { OtherUser } from '@/types/user';
 import UserList from './UserList';
 import Header from './Header';
 import SearchBar from './SearchBar';
+import { socket } from '@/lib/socket';
+import { useAuth } from './context/AuthContext';
 
 interface Props {
   chats: Chat[];
   handleChatClick: (chat: Chat, isNewChat?: boolean) => void;
   getFormattedTime: (createdAt?: string) => string;
+  onlineUsers: string[];
+  isTyping: boolean;
+  selectedChat: Chat | null;
 }
 
-function LeftSide({ chats, handleChatClick, getFormattedTime }: Props) {
+function LeftSide({
+  chats,
+  handleChatClick,
+  getFormattedTime,
+  onlineUsers,
+  isTyping,
+  selectedChat,
+}: Props) {
   const router = useRouter();
+
+  const { user } = useAuth();
 
   const [users, setUsers] = useState<OtherUser[]>([]);
   const [open, setOpen] = useState<boolean>(false);
@@ -154,16 +168,25 @@ function LeftSide({ chats, handleChatClick, getFormattedTime }: Props) {
         </div>
       ) : (
         <div className="overflow-y-auto scrollbar-modern">
-          {filteredChats.map((chat, idx) => (
-            <div
-              key={chat?.id || idx}
-              onClick={() => {
-                handleChatClick(chat);
-              }}
-            >
-              <ChatList chat={chat} getFormattedTime={getFormattedTime} />
-            </div>
-          ))}
+          {filteredChats.map((chat, idx) => {
+            const isOnline = onlineUsers.includes(chat?.otherUser?.id);
+            return (
+              <div
+                key={chat?.id || idx}
+                onClick={() => {
+                  handleChatClick(chat);
+                }}
+              >
+                <ChatList
+                  chat={chat}
+                  getFormattedTime={getFormattedTime}
+                  isOnline={isOnline}
+                  isTyping={isTyping}
+                  selectedChat={selectedChat}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

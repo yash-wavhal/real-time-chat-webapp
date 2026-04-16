@@ -9,6 +9,7 @@ import userRoutes from './routes/user.route';
 import messageRoutes from './routes/message.route';
 import chatRoutes from './routes/chat.route';
 import { Server } from 'socket.io';
+import prisma from './lib/prisma';
 
 dotenv.config();
 const PORT = process.env.PORT || 8000;
@@ -52,9 +53,51 @@ io.on('connection', (socket) => {
   //     });
   //   }
   // });
+  // SEND CURRENT ONLINE USERS TO NEW USER
+  socket.emit('getOnlineUsers', Array.from(userSocketMap.keys()));
 
-  socket.on('disconnect', () => {
+  // notify others
+  socket.broadcast.emit('userOnline', userId);
+
+  socket.on('disconnect', async () => {
     userSocketMap.delete(userId);
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        lastSeen: new Date(),
+      },
+    });
+    console.log('User disconnected: ', userId);
+    socket.broadcast.emit('userOffline', userId);
+  });
+
+  socket.on("joinChat", async (chatId) => {
+    const userId = socket.handshake.query.userId as string;
+
+    if (!userId || !chatId) return;
+
+    const chat = await prisma.chat.findFirst({
+      where: {
+        id: chatId,
+        users: {
+          some: {
+            id: userId,
+          },
+        },
+      },
+    });
+
+    if (!chat) {
+      return;
+    }
+    socket.join(chatId);
+  });
+
+  socket.on("typing", ({ chatId, userId }) => {
+    socket.to(chatId).emit("typing", { chatId, userId });
+  });
+  socket.on('stopTyping', ({ chatId, userId }) => {
+    socket.to(chatId).emit('stopTyping', { chatId, userId });
   });
 });
 
