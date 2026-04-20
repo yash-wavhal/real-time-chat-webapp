@@ -79,6 +79,11 @@ function ChatList({
           </p>
         )}
       </div>
+      {(chat.unreadCount ?? 0) > 0 && (
+        <span className="bg-green-500 text-white text-xs min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full">
+          {chat.unreadCount}
+        </span>
+      )}
     </div>
   );
 }

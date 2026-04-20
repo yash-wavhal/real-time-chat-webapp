@@ -79,7 +79,7 @@ export default function Page() {
     const fetchChats = async () => {
       try {
         const res = await api.get(`/chat`);
-        // console.log('chats: ', res.data.formattedChats);
+        console.log('chats: ', res.data.formattedChats);
         setChats(res.data.formattedChats);
       } catch (err) {
         console.log('Error fetching chats');
@@ -91,7 +91,7 @@ export default function Page() {
   useEffect(() => {
     if (!socket) return;
 
-    const handleNewMessage = (data: any) => {
+    const handleNewMessage = async (data: any) => {
       const { message, chat } = data;
 
       if (!chat || !chat.id) return;
@@ -99,13 +99,22 @@ export default function Page() {
       // ignore sender
       if (message.senderId === user?.id) return;
 
+      const isOpen = message.chatId === selectedChat?.id;
+
       // Update messages if open
-      if (message.chatId === selectedChat?.id) {
+      if (isOpen) {
         setMsgs((prev) => {
           const exists = prev.some((msg) => msg.id === message.id);
           if (exists) return prev;
           return [...prev, message];
         });
+        try {
+          await api.post('/chat/mark-read', {
+            chatId: chat.id,
+          });
+        } catch (err) {
+          console.log('Error marking read:', err);
+        }
       }
 
       // Update chat list
@@ -121,6 +130,9 @@ export default function Page() {
                 ...c,
                 lastMessage: chat.lastMessage,
                 updatedAt: chat.updatedAt,
+                unreadCount: isOpen
+                  ? 0 // open → always 0
+                  : (c.unreadCount || 0) + 1,
               };
             }
             return c;
@@ -134,7 +146,13 @@ export default function Page() {
           return [current, ...rest];
         }
 
-        return [chat, ...safePrev];
+        return [
+          {
+            ...chat,
+            unreadCount: isOpen ? 0 : 1,
+          },
+          ...safePrev,
+        ];
       });
     };
 
@@ -157,6 +175,15 @@ export default function Page() {
       const messages = await api.get(`/message/${chat.id}`);
       console.log('messages:', messages.data);
       setMsgs(messages.data.messages);
+
+      await api.post('/chat/mark-read', {
+        chatId: chat.id,
+      });
+
+      // reset unread count locally
+      setChats((prev) =>
+        prev.map((c) => (c.id === chat.id ? { ...c, unreadCount: 0 } : c))
+      );
     } catch (err: any) {
       console.log('Error in Fetching msgs for chat c', err.message);
     }

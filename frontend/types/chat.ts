@@ -10,4 +10,5 @@ export interface Chat {
   otherUser: OtherUser;
   members: OtherUser[];
   lastMessage: Message;
+  unreadCount?: number;
 }

@@ -21,7 +21,8 @@ export const getAllChats = async (req: Request, res: Response) => {
       },
       include: {
         users: {
-          include: {
+          select: {
+            lastReadAt: true,
             user: {
               select: {
                 id: true,
@@ -59,36 +60,58 @@ export const getAllChats = async (req: Request, res: Response) => {
     });
     // console.log("chats: ", chats);
 
-    const formattedChats = chats.map((chat) => {
-      const lastMessage = chat.messages[0] || null;
+    const formattedChats = await Promise.all(
+      chats.map(async (chat) => {
+        const lastMessage = chat.messages[0] || null;
 
-      const users = chat.users.map((u) => u.user);
+        // normalize users
+        const users = chat.users.map((u) => u.user);
 
-      if (!chat.isGroup) {
-        const otherUser = users.find((u) => u.id !== userId);
+        // get current user's ChatUser row
+        const chatUser = chat.users.find((u) => u.user.id === userId);
+        const lastReadAt = chatUser?.lastReadAt;
+
+        // unread count
+        const unreadCount = await prisma.message.count({
+          where: {
+            chatId: chat.id,
+            senderId: { not: userId },
+            ...(lastReadAt && {
+              createdAt: {
+                gt: lastReadAt,
+              },
+            }),
+          },
+        });
+
+        if (!chat.isGroup) {
+          const otherUser = users.find((u) => u.id !== userId);
+
+          return {
+            id: chat.id,
+            createdAt: chat.createdAt,
+            isGroup: false,
+            otherUser,
+            updatedAt: chat.updatedAt,
+            lastMessage,
+            unreadCount,
+          };
+        }
+
+        const otherUsers = users.filter((u) => u.id !== userId);
 
         return {
           id: chat.id,
           createdAt: chat.createdAt,
-          isGroup: false,
-          otherUser,
+          isGroup: true,
+          name: chat.name,
+          members: otherUsers,
           updatedAt: chat.updatedAt,
           lastMessage,
+          unreadCount,
         };
-      }
-
-      const otherUsers = users.filter((u) => u.id !== userId);
-
-      return {
-        id: chat.id,
-        createdAt: chat.createdAt,
-        isGroup: true,
-        name: chat.name,
-        members: otherUsers,
-        updatedAt: chat.updatedAt,
-        lastMessage,
-      };
-    });
+      })
+    );
 
     res.status(200).json({
       msg: 'Chats fetched successfully!',
@@ -311,6 +334,57 @@ export const deleteChat = async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.log('Error in Deleting Chat', err.message);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+export const markChatAsRead = async (req: Request, res: Response) => {
+  try {
+    const currUser = req.user;
+    const { chatId } = req.body;
+
+    if (!currUser) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!chatId) {
+      return res.status(400).json({ error: 'chatId is required' });
+    }
+
+    const userId = currUser.id;
+
+    // ensure user belongs to chat
+    const chatUser = await prisma.chatUser.findUnique({
+      where: {
+        userId_chatId: {
+          userId,
+          chatId,
+        },
+      },
+    });
+
+    if (!chatUser) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // mark as read
+    await prisma.chatUser.update({
+      where: {
+        userId_chatId: {
+          userId,
+          chatId,
+        },
+      },
+      data: {
+        lastReadAt: new Date(),
+      },
+    });
+
+    return res.status(200).json({
+      msg: 'Chat marked as read',
+    });
+  } catch (err: any) {
+    console.log('Error marking chat as read', err.message);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
