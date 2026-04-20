@@ -15,19 +15,23 @@ export const getAllChats = async (req: Request, res: Response) => {
       where: {
         users: {
           some: {
-            id: userId,
+            userId: userId,
           },
         },
       },
       include: {
         users: {
-          select: {
-            id: true,
-            email: true,
-            lastSeen: true,
-            username: true,
-            fullName: true,
-            profilePic: true,
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                lastSeen: true,
+                username: true,
+                fullName: true,
+                profilePic: true,
+              },
+            },
           },
         },
         messages: {
@@ -53,12 +57,15 @@ export const getAllChats = async (req: Request, res: Response) => {
         updatedAt: 'desc',
       },
     });
+    // console.log("chats: ", chats);
 
     const formattedChats = chats.map((chat) => {
       const lastMessage = chat.messages[0] || null;
 
+      const users = chat.users.map((u) => u.user);
+
       if (!chat.isGroup) {
-        const otherUser = chat.users.find((u) => u.id !== userId);
+        const otherUser = users.find((u) => u.id !== userId);
 
         return {
           id: chat.id,
@@ -70,7 +77,7 @@ export const getAllChats = async (req: Request, res: Response) => {
         };
       }
 
-      const otherUsers = chat.users.filter((u) => u.id !== userId);
+      const otherUsers = users.filter((u) => u.id !== userId);
 
       return {
         id: chat.id,
@@ -83,7 +90,10 @@ export const getAllChats = async (req: Request, res: Response) => {
       };
     });
 
-    res.status(200).json({ msg: 'Chats fetched successfully!', formattedChats });
+    res.status(200).json({
+      msg: 'Chats fetched successfully!',
+      formattedChats,
+    });
   } catch (err: any) {
     console.log('Error in getting all chats', err.message);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -99,45 +109,40 @@ export const createNewChat = async (req: Request, res: Response) => {
     }
 
     const { memberIds, name } = req.body;
+
     if (memberIds.length === 0) {
-      return res.status(400).json({
-        error: 'At least one member required',
-      });
+      return res.status(400).json({ error: 'At least one member required' });
     }
+
     if (memberIds.length > 1 && !name) {
-      return res.status(400).json({
-        error: 'Group name is required',
-      });
+      return res.status(400).json({ error: 'Group name is required' });
     }
 
     const userId = currUser.id;
+
     if (memberIds.includes(userId)) {
       return res.status(400).json({ error: 'Cannot chat with yourself' });
     }
 
     const otherUsers = [...new Set([...memberIds, userId])];
 
-    if (!otherUsers || otherUsers.length === 0) {
-      return res.status(400).json({ error: 'otherUsers are required' });
-    }
-
-    // Check if other user exists
+    // check users exist
     const users = await prisma.user.findMany({
-      where: {
-        id: { in: otherUsers },
-      },
+      where: { id: { in: otherUsers } },
     });
 
     if (users.length !== otherUsers.length) {
       return res.status(404).json({ error: 'Some users not found' });
     }
 
-    // Formatter (same as getAllChats)
+    // FORMATTER
     const formatChat = (chat: any) => {
       const lastMessage = chat.messages?.[0] || null;
 
+      const users = chat.users.map((u: any) => u.user);
+
       if (!chat.isGroup) {
-        const otherUser = chat.users.find((u: any) => u.id !== userId);
+        const otherUser = users.find((u: any) => u.id !== userId);
 
         return {
           id: chat.id,
@@ -149,7 +154,7 @@ export const createNewChat = async (req: Request, res: Response) => {
         };
       }
 
-      const members = chat.users.filter((u: any) => u.id !== userId);
+      const members = users.filter((u: any) => u.id !== userId);
 
       return {
         id: chat.id,
@@ -162,21 +167,28 @@ export const createNewChat = async (req: Request, res: Response) => {
       };
     };
 
-    // Check if chat already exists 1-1 chat only
-    if (memberIds.length == 1) {
+    // CHECK EXISTING 1-1 CHAT
+    if (memberIds.length === 1) {
       const existingChat = await prisma.chat.findFirst({
         where: {
           isGroup: false,
-          AND: [{ users: { some: { id: userId } } }, { users: { some: { id: memberIds[0] } } }],
+          AND: [
+            { users: { some: { userId: userId } } },
+            { users: { some: { userId: memberIds[0] } } },
+          ],
         },
         include: {
           users: {
-            select: {
-              id: true,
-              email: true,
-              username: true,
-              fullName: true,
-              profilePic: true,
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                  username: true,
+                  fullName: true,
+                  profilePic: true,
+                },
+              },
             },
           },
           messages: {
@@ -188,16 +200,13 @@ export const createNewChat = async (req: Request, res: Response) => {
               senderId: true,
               createdAt: true,
               sender: {
-                select: {
-                  id: true,
-                  username: true,
-                },
+                select: { id: true, username: true },
               },
             },
           },
         },
       });
-      // If chat exists → return formatted
+
       if (existingChat) {
         return res.status(200).json({
           msg: 'Chat already exists',
@@ -207,23 +216,32 @@ export const createNewChat = async (req: Request, res: Response) => {
       }
     }
 
-    // Create new chat
+    // CREATE CHAT
     const newChat = await prisma.chat.create({
       data: {
         isGroup: memberIds.length > 1,
         name: memberIds.length > 1 ? name : null,
         users: {
-          connect: otherUsers.map((id) => ({ id })),
+          create: otherUsers.map((id) => ({
+            user: {
+              connect: { id },
+            },
+            lastReadAt: new Date(),
+          })),
         },
       },
       include: {
         users: {
-          select: {
-            id: true,
-            email: true,
-            username: true,
-            fullName: true,
-            profilePic: true,
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                username: true,
+                fullName: true,
+                profilePic: true,
+              },
+            },
           },
         },
         messages: {
@@ -235,10 +253,7 @@ export const createNewChat = async (req: Request, res: Response) => {
             senderId: true,
             createdAt: true,
             sender: {
-              select: {
-                id: true,
-                username: true,
-              },
+              select: { id: true, username: true },
             },
           },
         },
@@ -277,7 +292,7 @@ export const deleteChat = async (req: Request, res: Response) => {
         id: chatId,
         users: {
           some: {
-            id: userId,
+            userId: userId,
           },
         },
       },

@@ -5,9 +5,6 @@ import { io, userSocketMap } from '..';
 export const getAllMsgs = async (req: Request, res: Response) => {
   try {
     const currUser = req.user;
-    // console.log('body:', req.body);
-    // console.log('query:', req.query);
-    // console.log('params:', req.params);
     const chatId = req.params.chatid as string;
 
     if (!currUser) {
@@ -25,7 +22,7 @@ export const getAllMsgs = async (req: Request, res: Response) => {
         id: chatId,
         users: {
           some: {
-            id: userId,
+            userId: userId,
           },
         },
       },
@@ -63,7 +60,6 @@ export const createNewMsg = async (req: Request, res: Response) => {
     const currUser = req.user;
     const { chatId, content } = req.body;
 
-    // Auth check first
     if (!currUser) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -78,13 +74,13 @@ export const createNewMsg = async (req: Request, res: Response) => {
 
     const userId = currUser.id;
 
-    // Check user belongs to chat
+    // validate using ChatUser
     const chat = await prisma.chat.findFirst({
       where: {
         id: chatId,
         users: {
           some: {
-            id: userId,
+            userId: userId,
           },
         },
       },
@@ -112,25 +108,27 @@ export const createNewMsg = async (req: Request, res: Response) => {
       },
     });
 
-    // Update chat timestamp (important for sorting chats)
+    // Update chat timestamp
     await prisma.chat.update({
       where: { id: chatId },
-      data: {
-        updatedAt: new Date(),
-      },
+      data: { updatedAt: new Date() },
     });
 
-    // Get all users in chat
+    // GET CHAT USERS (FIXED)
     const chatWithDetails = await prisma.chat.findUnique({
       where: { id: chatId },
       include: {
         users: {
-          select: {
-            id: true,
-            email: true,
-            username: true,
-            fullName: true,
-            profilePic: true,
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                username: true,
+                fullName: true,
+                profilePic: true,
+              },
+            },
           },
         },
         messages: {
@@ -152,19 +150,19 @@ export const createNewMsg = async (req: Request, res: Response) => {
       },
     });
 
-    // safety check
     if (!chatWithDetails) {
       return res.status(500).json({ error: 'Chat not found after message creation' });
     }
 
-    // FORMAT FUNCTION (PER USER)
+    // NORMALIZE USERS
+    const users = chatWithDetails.users.map((u) => u.user);
+
+    // FORMATTER (UPDATED)
     const formatChatForUser = (chat: any, currentUserId: string) => {
       const lastMessage = chat.messages?.[0] || null;
 
       if (!chat.isGroup) {
-        const otherUser = chat.users.find(
-          (u: any) => u.id !== currentUserId
-        );
+        const otherUser = users.find((u) => u.id !== currentUserId);
 
         return {
           id: chat.id,
@@ -176,7 +174,7 @@ export const createNewMsg = async (req: Request, res: Response) => {
         };
       }
 
-      const members = chat.users.filter((u: any) => u.id !== currentUserId);
+      const members = users.filter((u) => u.id !== currentUserId);
 
       return {
         id: chat.id,
@@ -189,18 +187,17 @@ export const createNewMsg = async (req: Request, res: Response) => {
       };
     };
 
-    // EMIT TO ALL USERS (INCLUDING SENDER)
-    chatWithDetails.users.forEach((user) => {
-      if (user.id === userId) return;
-      const socketId = userSocketMap.get(user.id);
+    // SOCKET EMIT
+    chatWithDetails.users.forEach((chatUser) => {
+      const receiverId = chatUser.userId;
+
+      if (receiverId === userId) return;
+
+      const socketId = userSocketMap.get(receiverId);
 
       if (!socketId) return;
 
-      // format per user
-      const formattedChat = formatChatForUser(chatWithDetails, user.id);
-
-      console.log('Sending to user:', user.id);
-      console.log('Socket found:', socketId);
+      const formattedChat = formatChatForUser(chatWithDetails, receiverId);
 
       io.to(socketId).emit('newMessage', {
         message: newMsg,
