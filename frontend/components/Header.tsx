@@ -7,15 +7,25 @@ interface Props {
   open: boolean;
   setOpen: React.Dispatch<React.SetStateAction<boolean>>;
   handleLogout: () => void;
+  setIsCreateGrp: React.Dispatch<React.SetStateAction<boolean>>;
+  isCreateGrp: boolean;
 }
 
-function Header({ setShowUsers, showUsers, setOpen, open, handleLogout }: Props) {
+function Header({
+  setShowUsers,
+  showUsers,
+  setOpen,
+  open,
+  handleLogout,
+  setIsCreateGrp,
+  isCreateGrp,
+}: Props) {
   return (
     <div className="h-18 p-4 border-b border-gray-700 flex justify-between items-center relative">
       <p className="text-xl font-semibold text-white">Chats</p>
       <div className="relative flex gap-4">
         <span
-          className="cursor-pointer p-2 rounded-full hover:bg-gray-700 transition duration-200 flex items-center justify-center"
+          className="cursor-pointer p-2 rounded-full hover:bg-mist-700 transition duration-300 flex items-center justify-center"
           aria-hidden="true"
           onClick={() => setShowUsers(!showUsers)}
         >
@@ -37,17 +47,27 @@ function Header({ setShowUsers, showUsers, setOpen, open, handleLogout }: Props)
         </span>
         <button
           onClick={() => setOpen((prev) => !prev)}
-          className="text-gray-100 text-2xl px-2 hover:rounded-4xl hover:bg-gray-600 cursor-pointer"
+          className="text-gray-100 text-2xl px-2 hover:rounded-4xl transition duration-300 hover:bg-mist-600 cursor-pointer"
         >
           ⋮
         </button>
         {open && (
-          <div className="absolute right-0 top-10 mt-2 w-32 bg-mist-300 text-black rounded shadow-md">
+          <div className="absolute p-0.5 left-16 top-8 mt-2 w-max bg-neutral-700 text-white rounded-xl shadow-md">
             <button
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 cursor-pointer"
+              className="w-full text-left text-[14px] px-4 py-2 hover:bg-neutral-800 hover:rounded-xl cursor-pointer"
               onClick={handleLogout}
             >
               Logout
+            </button>
+            <button
+              className="w-full text-left px-4 py-2 text-[14px] hover:bg-neutral-800 hover:rounded-xl cursor-pointer"
+              onClick={() => {
+                setIsCreateGrp(!isCreateGrp);
+                setShowUsers(true);
+                setOpen(!open);
+              }}
+            >
+              Create Group
             </button>
           </div>
         )}

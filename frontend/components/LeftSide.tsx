@@ -17,6 +17,7 @@ interface Props {
   onlineUsers: string[];
   isTyping: boolean;
   selectedChat: Chat | null;
+  whoTyping: string;
 }
 
 function LeftSide({
@@ -26,6 +27,7 @@ function LeftSide({
   onlineUsers,
   isTyping,
   selectedChat,
+  whoTyping,
 }: Props) {
   const router = useRouter();
 
@@ -39,12 +41,16 @@ function LeftSide({
   const [filteredUsers, setFilteredUsers] = useState<OtherUser[]>(users);
   const [showUsers, setShowUsers] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
+  const [isCreateGrp, setIsCreateGrp] = useState<boolean>(false);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [groupName, setGroupName] = useState<string>('');
 
   useEffect(() => {
     if (!showUsers) return;
 
     const fetchUsers = async () => {
       const res = await api.get('/user');
+      console.log('yes....');
       setFilteredUsers(res.data);
       setUsers(res.data);
     };
@@ -94,15 +100,25 @@ function LeftSide({
   };
 
   const handleUserClick = async (userId: string) => {
+    // GROUP MODE → only select/deselect
+    if (isCreateGrp) {
+      setSelectedUsers((prev) =>
+        prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+      );
+      return;
+    }
+
+    // NORMAL MODE → create chat (your existing logic)
     if (loading) return;
+
     try {
       setLoading(true);
+
       const res = await api.post('/chat', {
-        otherUserId: userId,
+        memberIds: [userId],
       });
 
       const chat = res.data.chat;
-      // console.log("chat", chat);
       const isNewChat = res.data.isNewChat;
 
       handleChatClick(chat, isNewChat);
@@ -121,25 +137,58 @@ function LeftSide({
     }
   };
 
+  const handleCreateGroup = async () => {
+    if (selectedUsers.length < 2) {
+      alert('Select at least 2 users');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const res = await api.post('/chat', {
+        memberIds: selectedUsers,
+        name: groupName,
+      });
+
+      const chat = res.data.chat;
+
+      handleChatClick(chat, true);
+
+      setFilteredChats((prev) => [chat, ...prev]);
+
+      // reset
+      setSelectedUsers([]);
+      setShowUsers(false);
+      setIsCreateGrp(false);
+    } catch (err: any) {
+      console.log('Error:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-gray-500 border-t-white rounded-full animate-spin"></div>
-          <p className="text-sm text-gray-300">Creating chat...</p>
+          <div className="w-10 h-10 border-4 border-mist-500 border-t-white rounded-full animate-spin"></div>
+          <p className="text-sm text-mist-300">Creating chat...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="h-full flex flex-col min-h-0">
       <Header
         setShowUsers={setShowUsers}
         showUsers={showUsers}
         setOpen={setOpen}
         open={open}
         handleLogout={handleLogout}
+        isCreateGrp={isCreateGrp}
+        setIsCreateGrp={setIsCreateGrp}
       />
 
       <SearchBar
@@ -155,34 +204,74 @@ function LeftSide({
         }}
       />
 
-      {showUsers ? (
-        <div className="overflow-y-auto scrollbar-modern">
-          <div className="p-3 text-white font-semibold border-b border-gray-800">
-            Start a New Chat
-          </div>
-          {filteredUsers.map((user) => (
-            <div key={user.id} onClick={() => handleUserClick(user.id)}>
-              <UserList user={user} />
+      {showUsers || isCreateGrp ? (
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Header */}
+          <div className="bg-mist-900">
+            <div className="p-3 text-white font-semibold border-b border-mist-800">
+              {isCreateGrp ? 'Create a Group Chat (select users)' : 'Start a New Chat'}
             </div>
-          ))}
+
+            {isCreateGrp && selectedUsers.length >= 2 && (
+              <div className="p-3">
+                <input
+                  type="text"
+                  placeholder="Enter group name"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  className="w-full p-2 bg-mist-900 text-white border border-mist-700 rounded"
+                />
+              </div>
+            )}
+
+            {isCreateGrp && (
+              <div className="p-3 border-t border-mist-800">
+                <button
+                  onClick={handleCreateGroup}
+                  className="w-full bg-green-600 hover:bg-green-700 cursor-pointer text-white py-2 rounded"
+                >
+                  Create Group ({selectedUsers.length})
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto min-h-0 scrollbar-modern">
+            {filteredUsers.map((user) => {
+              const isSelected = selectedUsers.includes(user.id);
+
+              return (
+                <div
+                  key={user.id}
+                  onClick={() => handleUserClick(user.id)}
+                  className="cursor-pointer hover:bg-mist-800"
+                >
+                  <UserList user={user} isSelected={isSelected} isCreateGrp={isCreateGrp} />
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : (
-        <div className="overflow-y-auto scrollbar-modern">
+        <div className="flex-1 overflow-y-auto min-h-0 scrollbar-modern">
           {filteredChats.map((chat, idx) => {
-            const isOnline = onlineUsers.includes(chat?.otherUser?.id);
+            const onlineCount =
+              chat?.members?.filter((u) => onlineUsers.includes(u.id)).length || 0;
+
+            const isOnline = chat.isGroup
+              ? chat.members.some((u) => onlineUsers.includes(u.id))
+              : onlineUsers.includes(chat?.otherUser?.id);
+
             return (
-              <div
-                key={chat?.id || idx}
-                onClick={() => {
-                  handleChatClick(chat);
-                }}
-              >
+              <div key={chat?.id || idx} onClick={() => handleChatClick(chat)}>
                 <ChatList
                   chat={chat}
                   getFormattedTime={getFormattedTime}
                   isOnline={isOnline}
                   isTyping={isTyping}
                   selectedChat={selectedChat}
+                  whoTyping={whoTyping}
+                  onlineCount={onlineCount}
                 />
               </div>
             );

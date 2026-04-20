@@ -17,6 +17,7 @@ export default function Page() {
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState<boolean>(false);
+  const [whoTyping, setWhoTyping] = useState<string>("");
 
   useEffect(() => {
     socket?.emit("joinChat", selectedChat?.id)
@@ -27,6 +28,7 @@ export default function Page() {
     socket.on('typing', ({ chatId, userId }) => {
       if (chatId === selectedChat?.id && userId !== user?.id) {
         setIsTyping(true);
+        setWhoTyping(userId);
       }
     });
 
@@ -77,6 +79,7 @@ export default function Page() {
     const fetchChats = async () => {
       try {
         const res = await api.get(`/chat`);
+        // console.log('chats: ', res.data.formattedChats);
         setChats(res.data.formattedChats);
       } catch (err) {
         console.log('Error fetching chats');
@@ -152,7 +155,7 @@ export default function Page() {
       }
 
       const messages = await api.get(`/message/${chat.id}`);
-      console.log('messages:', messages.data.messages);
+      console.log('messages:', messages.data);
       setMsgs(messages.data.messages);
     } catch (err: any) {
       console.log('Error in Fetching msgs for chat c', err.message);
@@ -181,6 +184,7 @@ export default function Page() {
           onlineUsers={onlineUsers}
           isTyping={isTyping}
           selectedChat={selectedChat}
+          whoTyping={whoTyping}
         />
       </div>
 
@@ -189,6 +193,7 @@ export default function Page() {
         {selectedChat ? (
           <ChatWindow
             selectedChat={selectedChat}
+            setSelectedChat={setSelectedChat}
             msgs={msgs}
             getFormattedTime={getFormattedTime}
             setMsgs={setMsgs}

@@ -6,8 +6,9 @@ import { useAuth } from './context/AuthContext';
 import { Chat } from '@/types/chat';
 import { Message } from '@/types/message';
 import '../app/global.css';
-import { Send, SendHorizonalIcon } from 'lucide-react';
+import { Delete, DeleteIcon, Send, SendHorizonalIcon, Trash, Trash2 } from 'lucide-react';
 import { socket } from '@/lib/socket';
+import Profile from './Profile';
 
 interface Props {
   selectedChat: Chat;
@@ -17,12 +18,22 @@ interface Props {
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>;
   isTyping: boolean;
   onlineUsers: string[];
+  setSelectedChat: React.Dispatch<React.SetStateAction<Chat | null>>;
 }
 
-export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMsgs, setChats, isTyping, onlineUsers }: Props) {
+export default function ChatWindow({
+  selectedChat,
+  msgs,
+  getFormattedTime,
+  setMsgs,
+  setChats,
+  isTyping,
+  onlineUsers,
+  setSelectedChat,
+}: Props) {
   const [msg, setMsg] = useState<string>('');
   const { user, loading } = useAuth();
-  // console.log('selectedChat', selectedChat);
+  const [viewProf, setViewProf] = useState<boolean>(false);
 
   if (!user?.id) return;
 
@@ -99,7 +110,7 @@ export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMs
         return [currentChat, ...rest];
       }
 
-      // Case 2: NEW CHAT (THIS WAS MISSING)
+      // Case 2: NEW CHAT
       const newChat = {
         ...selectedChat,
         lastMessage: tempMsg,
@@ -121,11 +132,17 @@ export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMs
     }
   };
 
+  const handleViewProfile = () => {
+    setViewProf(true);
+  };
+
   const isOnline = onlineUsers.includes(selectedChat?.otherUser?.id);
   return (
     <div className="w-full h-full flex flex-col">
-      {/* Header */}
-      <div className="p-4 bg-mist-800 h-18 flex items-center gap-3">
+      <div
+        onClick={handleViewProfile}
+        className="p-4 bg-mist-800 h-18 flex items-center gap-3 cursor-pointer"
+      >
         <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-600 flex items-center justify-center text-white">
           {!selectedChat?.isGroup ? (
             selectedChat?.otherUser?.profilePic ? (
@@ -150,29 +167,39 @@ export default function ChatWindow({ selectedChat, msgs, getFormattedTime, setMs
           <p className="font-semibold">
             {!selectedChat?.isGroup ? selectedChat?.otherUser?.username : selectedChat?.name}
           </p>
-          {isTyping && <p className="text-sm text-gray-500">typing...</p>}
-          {!isOnline && (
-            <p className="text-xs text-gray-400">
-              {selectedChat?.otherUser?.lastSeen
-                ? `last seen ${new Date(selectedChat.otherUser.lastSeen).toLocaleTimeString()}`
-                : 'last seen recently'}
-            </p>
+          {isTyping ? (
+            <p className="text-sm text-gray-400">typing...</p>
+          ) : (
+            !isOnline && (
+              <p className="text-xs text-gray-400">
+                {selectedChat?.otherUser?.lastSeen
+                  ? `last seen ${new Date(selectedChat.otherUser.lastSeen).toLocaleTimeString()}`
+                  : 'last seen recently'}
+              </p>
+            )
           )}
         </div>
       </div>
+
+      {viewProf && (
+        <Profile
+          setViewProf={setViewProf}
+          selectedChat={selectedChat}
+          setChats={setChats}
+          setSelectedChat={setSelectedChat}
+        />
+      )}
 
       {/* Messages */}
       <div id="chat-container" className="flex-1 p-2 overflow-y-auto scrollbar-modern space-y-3">
         {msgs.map((msg) => (
           <div
             key={msg.id}
-            className={`flex ${
-              msg?.senderId === selectedChat?.otherUser?.id ? 'justify-start' : 'justify-end'
-            }`}
+            className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
           >
             <div
               className={`${
-                msg?.senderId === selectedChat?.otherUser?.id
+                msg.senderId !== user?.id
                   ? 'bg-gray-300 rounded-bl-2xl rounded-tr-2xl rounded-br-2xl'
                   : 'bg-green-300 rounded-br-2xl rounded-tl-2xl rounded-bl-2xl'
               } px-3 py-2 max-w-xs`}

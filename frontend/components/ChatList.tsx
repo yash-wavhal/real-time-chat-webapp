@@ -6,12 +6,22 @@ interface Props {
   isOnline: boolean;
   isTyping: boolean;
   selectedChat: Chat | null;
+  whoTyping: string;
+  onlineCount: number;
 }
 
-function ChatList({ chat, getFormattedTime, isOnline, isTyping, selectedChat }: Props) {
+function ChatList({
+  chat,
+  getFormattedTime,
+  isOnline,
+  isTyping,
+  selectedChat,
+  whoTyping,
+  onlineCount,
+}: Props) {
   if (!chat) return null;
   return (
-    <div className="relative flex items-center gap-3 p-3 rounded-b-xl cursor-pointer hover:bg-mist-800 transition border-b border-mist-900">
+    <div className="relative flex items-center gap-3 p-3 rounded-b-xldjnjjndjnj cursor-pointer hover:bg-mist-800 transition border-b border-mist-900">
       <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-600 flex items-center justify-center text-white">
         {!chat?.isGroup ? (
           chat?.otherUser?.profilePic ? (
@@ -30,8 +40,14 @@ function ChatList({ chat, getFormattedTime, isOnline, isTyping, selectedChat }: 
             {chat?.members?.[0]?.username?.charAt(0).toUpperCase() || 'G'}
           </div>
         )}
-        {!chat?.isGroup && isOnline && (
-          <span className="absolute left-9 bottom-2 w-3 h-3 bg-green-500 rounded-full border-2 border-black"></span>
+        {isOnline && (
+          <div className="group inline-block">
+            <span className="absolute w-3 h-3 left-9 bottom-2 bg-green-500 rounded-full cursor-pointer"></span>
+
+            <div className="absolute left-13 top-14 hidden group-hover:block bg-black border border-white text-white text-xs px-2 py-1 rounded mt-1 whitespace-nowrap">
+              {chat.isGroup ? `${onlineCount} online` : 'online'}
+            </div>
+          </div>
         )}
       </div>
 
@@ -49,12 +65,14 @@ function ChatList({ chat, getFormattedTime, isOnline, isTyping, selectedChat }: 
           </span>
         </div>
 
-        {!chat.isGroup ? (
-          selectedChat?.id === chat?.id && isTyping ? (
+        {selectedChat?.id === chat?.id && isTyping ? (
+          !chat.isGroup ? (
             <p className="text-sm text-gray-500">typing...</p>
           ) : (
-            <p className="text-sm text-gray-400 truncate">{chat?.lastMessage?.content}</p>
+            <p className="text-sm text-gray-500">{whoTyping}: typing...</p>
           )
+        ) : !chat.isGroup ? (
+          <p className="text-sm text-gray-400 truncate">{chat?.lastMessage?.content}</p>
         ) : (
           <p className="text-sm text-gray-400 truncate">
             {chat?.lastMessage?.sender?.username}: {chat?.lastMessage?.content}
